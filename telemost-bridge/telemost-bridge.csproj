@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>telemost-bridge</AssemblyName>
+    <RootNamespace>TelemostBridge</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- WPF is only referenced for the UIAutomationClient/UIAutomationTypes assemblies. -->
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>

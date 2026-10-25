@@ -1,0 +1,16 @@
+# build output
+bin/
+obj/
+dist/
+.vs/
+*.user
+
+# local snapshots / backups (not part of the source)
+release/
+backup/
+*.zip
+
+# runtime data
+logs/
+token-*.txt
+keys.txt
