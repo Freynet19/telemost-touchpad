@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build fake-teams
+        run: dotnet build fake-teams/fake-teams.csproj -c Release
+
+      - name: Build telemost-bridge
+        run: dotnet build telemost-bridge/telemost-bridge.csproj -c Release
+
+      # Starts the server on a spare port and talks to it like Dell Optimizer would. No hardware needed.
+      - name: Self-test (fake Teams server)
+        shell: pwsh
+        run: ./fake-teams/selftest.ps1
+
+      - name: Package
+        shell: pwsh
+        run: ./build.ps1 -Zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: telemost-touchpad
+          path: dist.zip

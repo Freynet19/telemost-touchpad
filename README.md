@@ -128,6 +128,18 @@ Run the server's self-test (needs `dotnet build -c Release fake-teams` first): `
 - Commands pressed while the bridge is not running are lost (older than 3 s are dropped).
 - Depends on Telemost's internal control names and on Optimizer treating this server as Teams.
 
+## Reporting problems and contributing
+
+Open an issue with the bug-report template: the versions of Dell Optimizer, Telemost and Windows plus the relevant log
+lines matter a lot, because this project depends on all of them. Pull requests are welcome. The server has a self-test
+(`fake-teams\selftest.ps1`) and GitHub Actions builds both programs and runs it on every push. The security model is in
+[SECURITY.md](SECURITY.md), the history in [CHANGELOG.md](CHANGELOG.md).
+
+## Releases
+
+Pushing a version tag (for example `git tag v0.1.0 && git push origin v0.1.0`) makes GitHub Actions build the installable
+zip and attach it to a GitHub Release. Unzip it and run `install.ps1` (preview with `-WhatIf` first).
+
 ## Legal
 
 Unofficial interoperability project for the author's own hardware. Not affiliated with, endorsed by or supported by
