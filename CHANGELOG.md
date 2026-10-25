@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Chat from the touchpad while sharing: opens the "Meeting chat" window through the mini window's "..." menu, and a
+  second press closes that window.
+
 ## 0.1.0 - 2026-10-25
 
 First version.

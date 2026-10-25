@@ -27,7 +27,7 @@ touchpad lights <-- Dell Optimizer <------------ meeting state ---------- fake-t
 | Microphone | mutes / unmutes for real | works (mini window's mic button) |
 | Camera | starts / stops the camera for real | works (through the "…" menu, which flashes briefly) |
 | Share | opens Telemost's own picker; pressing again cancels it | stops sharing |
-| Chat | opens / closes the chat panel | not available |
+| Chat | opens / closes the chat panel | opens / closes the separate "Meeting chat" window (through the "…" menu) |
 
 The lights follow the real Telemost state, also when you change it with the mouse. The chat button breathes when new
 messages arrive while the chat is closed. Buttons are lit only while a call window exists; with just the main Telemost
@@ -87,8 +87,9 @@ its accessibility mode, which may cost it a little.
 
 - The bridge touches Telemost only with real clicks (`InvokePattern`) on the microphone, camera, chat and screen-share
   controls, the "Cancel" button of the share picker, the stop-sharing button of the mini window and, for the camera
-  while sharing, the "…" menu and its "Video" item. It never touches "end call", settings, participants, recording, or
-  the picker's start button; it never chooses what to share.
+  and chat while sharing, the "…" menu with its "Video" and "Chat" items and the "Meeting chat" window (closed with a
+  window-close request, checked by the window class, never the main Telemost window). It never touches "end call",
+  settings, participants, recording, or the picker's start button; it never chooses what to share.
 - Everything listens on `127.0.0.1` only, but **without authentication**: any local process could pretend to be
   Optimizer or the bridge (the pairing token is not a secret). This is acceptable on a single-user machine, not on a
   shared one.
@@ -122,9 +123,9 @@ Run the server's self-test (needs `dotnet build -c Release fake-teams` first): `
 
 ## Known limitations
 
-- Chat cannot be driven while sharing (the mini window has no chat toggle).
 - The share picker still has to be used by hand to choose a screen or window.
-- Camera control while sharing opens the "…" menu for a moment.
+- Camera and chat control while sharing open the "…" menu for a moment, and the chat opens as a separate window that
+  may take focus. The unread-message light cannot be updated while the chat is closed during sharing.
 - Commands pressed while the bridge is not running are lost (older than 3 s are dropped).
 - Depends on Telemost's internal control names and on Optimizer treating this server as Teams.
 

@@ -13,8 +13,9 @@ using System.Windows.Automation;
 //   - InvokePattern.Invoke() on "Share screen" (opens Telemost's own picker dialog; it never picks a source);
 //     pressing it again while the picker is open invokes the picker's "Cancel" button (never its start button)
 //   - InvokePattern.Invoke() on the stop-sharing button of the mini window while sharing
-//   - while sharing, for the camera only: Invoke() on the mini window's "..." button, Invoke() on the "Video" menu
-//     item, then closing that menu window (WindowPattern.Close() if it did not close itself)
+//   - while sharing, for the camera and the chat: Invoke() on the mini window's "..." button, then on the menu's
+//     "Video" / "Chat" item, then closing that menu window (WindowPattern.Close() if it did not close itself);
+//     a second chat press closes the "Meeting chat" window (WindowPattern.Close(), checked by its class)
 // It never touches participants, reactions, invite, menu or "end call".
 //
 // Telemost has two UIs: the normal call window, and while a screen is shared a mini window plus a
@@ -176,6 +177,7 @@ sealed class TelemostReader
     const string HudClass = "ScreenHUD";
     const string DialogClass = "StartScreencastDialog";
     const string MenuClass = "MiniControlPanelMenuWidget";   // the "..." popup of the mini window
+    const string ChatDialogClass = "MiniConferenceChatDialog";   // "Meeting chat": the chat opened from that menu while sharing
     const string PanelClass = "ControlPanelWidget";
     const string MiniButtonIdSuffix = ".footerWidget.SimplePanelButton";
 
@@ -233,6 +235,10 @@ sealed class TelemostReader
                 var openMenu = TopLevel(MenuClass);
                 if (openMenu is not null && FindMenuItem(openMenu, ".cameraMenuItem") is { } cameraItem && Switch.TryCreate(cameraItem) is { } cameraSwitch)
                     heldVideoOn = cameraSwitch.State == ToggleState.Off;
+                // While sharing, the chat lives in its own window; its presence is the "chat open" state.
+                bool chatWindowOpen = TopLevel(ChatDialogClass) is not null;
+                if (chatWindowOpen) { chatWasOpen = true; heldUnread = 0; }
+                heldChatOpen = chatWindowOpen;
                 return new CallState(true, muted, heldVideoOn, heldChatOpen, sharing, heldUnread, true);
             }
             ForgetMini();
@@ -310,11 +316,11 @@ sealed class TelemostReader
             .FirstOrDefault(e => e.Current.AutomationId.EndsWith(idSuffix, StringComparison.Ordinal));
 
     /// <summary>
-    /// While sharing, the camera exists only in the "..." menu: open it (Invoke on the mini window's third button),
-    /// click "Video" if the state differs, then close the menu. Only the "..." button, the "Video" item and the
-    /// menu window itself are touched.
+    /// While sharing, the camera and the chat are reachable only through the "..." menu of the mini window: open it
+    /// (Invoke on the mini window's third button), run <paramref name="action"/> on it, then close the menu. Only the
+    /// "..." button, the one menu item the action uses and the menu window itself are touched.
     /// </summary>
-    string CameraViaMenu(bool wantVideoOn)
+    string WithMenu(Func<AutomationElement, string> action)
     {
         if (miniMore is null) return "\"...\" button of the mini window not found, nothing done";
         if (TopLevel(MenuClass) is not null) return "menu is already open (opened by the user?), nothing done";
@@ -324,34 +330,55 @@ sealed class TelemostReader
         WaitFor(() => (menu = TopLevel(MenuClass)) is not null, 1500);
         if (menu is null) return "menu did not appear within 1.5 s, nothing done";
 
-        string result, closeNote = "";
-        try
-        {
-            var item = FindMenuItem(menu, ".cameraMenuItem");
-            var video = item is null ? null : Switch.TryCreate(item);
-            if (video is null) return "Video item not found in the menu, nothing done";
-
-            bool videoOnNow = video.State == ToggleState.Off;   // check box On == camera off
-            heldVideoOn = videoOnNow;
-            if (videoOnNow == wantVideoOn)
-            {
-                result = $"camera already {(wantVideoOn ? "ON" : "OFF")}, nothing to do";
-            }
-            else
-            {
-                var want = wantVideoOn ? ToggleState.Off : ToggleState.On;
-                video.Press();   // <- the write: a real click on the menu's Video item
-                result = WaitFor(() => video.State == want)
-                    ? $"camera (via menu) toggled -> {(wantVideoOn ? "ON" : "OFF")}"
-                    : "camera (via menu) clicked but state not confirmed after 2 s";
-                heldVideoOn = video.State == ToggleState.Off;
-            }
-        }
-        finally
-        {
-            closeNote = CloseMenu();
-        }
+        string result, closeNote;
+        try { result = action(menu); }
+        finally { closeNote = CloseMenu(); }
         return $"{result}; menu {closeNote}";
+    }
+
+    string CameraViaMenu(bool wantVideoOn) => WithMenu(menu =>
+    {
+        var item = FindMenuItem(menu, ".cameraMenuItem");
+        var video = item is null ? null : Switch.TryCreate(item);
+        if (video is null) return "Video item not found in the menu, nothing done";
+
+        bool videoOnNow = video.State == ToggleState.Off;   // check box On == camera off
+        heldVideoOn = videoOnNow;
+        if (videoOnNow == wantVideoOn) return $"camera already {(wantVideoOn ? "ON" : "OFF")}, nothing to do";
+
+        var want = wantVideoOn ? ToggleState.Off : ToggleState.On;
+        video.Press();   // <- the write: a real click on the menu's Video item
+        heldVideoOn = video.State == ToggleState.Off;
+        return WaitFor(() => video.State == want)
+            ? $"camera (via menu) toggled -> {(wantVideoOn ? "ON" : "OFF")}"
+            : "camera (via menu) clicked but state not confirmed after 2 s";
+    });
+
+    /// <summary>
+    /// Chat while sharing: it is a separate "Meeting chat" window. Closed -> open it through the menu's Chat item;
+    /// open -> close exactly that window (checked by its class, never the main Telemost window).
+    /// </summary>
+    string ChatWhileSharing()
+    {
+        var chatWindow = TopLevel(ChatDialogClass);
+        if (chatWindow is not null)
+        {
+            if (!chatWindow.TryGetCurrentPattern(WindowPattern.Pattern, out object? window)) return "chat window cannot be closed (no Window pattern), nothing done";
+            ((WindowPattern)window).Close();
+            return WaitFor(() => TopLevel(ChatDialogClass) is null)
+                ? "chat window closed"
+                : "chat window still open after 2 s";
+        }
+
+        return WithMenu(menu =>
+        {
+            var item = FindMenuItem(menu, ".chatMenuItem");
+            if (item is null || !item.TryGetCurrentPattern(InvokePattern.Pattern, out object? invoke)) return "Chat item not found in the menu, nothing done";
+            ((InvokePattern)invoke).Invoke();   // <- the write: opens the chat window
+            return WaitFor(() => TopLevel(ChatDialogClass) is not null, 3000)
+                ? "chat window opened"
+                : "Chat clicked but no chat window appeared within 3 s";
+        });
     }
 
     /// <summary>
@@ -375,7 +402,8 @@ sealed class TelemostReader
 
     string Chat(CallState now)
     {
-        if (now.Mini || chat is null) return "chat is not available in the mini sharing window, nothing done";
+        if (now.Mini) return ChatWhileSharing();
+        if (chat is null) return "chat button not found, nothing done";
         var button = chat;
         bool wasOpen = now.ChatOpen;
         button.Press();

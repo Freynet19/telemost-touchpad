@@ -81,6 +81,11 @@ Qt 6 + QtWebEngine application. Its widgets expose a native UI Automation tree.
   ("Video", check box), `videoMenuItem` ("Stop"), `reactionMenuItem`, `participantsMenuItem`, `chatMenuItem`,
   `localRecordMenuItem`, `permissionsMenuItem`, `settingsMenuItem`, `endCallMenuItem`. It closes by itself after a click on
   an item. This is the only place the camera is reachable while sharing. **[verified]**
+- Clicking the menu's Chat item opens the chat as its own window, `MiniConferenceChatDialog` titled "Meeting chat"
+  (a Qt dialog hosting a QtWebEngine page; no minimise/maximise, supports the Window pattern, so
+  `WindowPattern.Close()` closes just that dialog). It is not the main application window (`Messenger::MessengerWindow`,
+  title "Yandex Telemost"), which must never be closed this way. The window's presence is the "chat open" state while
+  sharing. **[verified]**
 - Windows' privacy record
   `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam\NonPackaged\C:#Program Files#Yandex#YandexTelemost#YandexTelemost.exe`
   (`LastUsedTimeStart/Stop`) is a handy objective check that the camera really started. It keeps only the last session.
